@@ -2,12 +2,10 @@ package com.example.dailylist;
 
 import android.app.*;
 import android.os.Bundle;
-import android.content.*;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.view.*;
-import android.view.inputmethod.InputMethodManager;
 import android.widget.*;
 import org.json.*;
 import java.time.*;
@@ -15,9 +13,10 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 
 public class MainActivity extends Activity {
-    static final int INK = Color.rgb(34,42,39), MUTED = Color.rgb(116,122,118), GREEN = Color.rgb(53,95,82);
+    static final int INK = Color.rgb(22,42,58), MUTED = Color.rgb(103,124,142), BLUE = Color.rgb(35,88,140);
+    static final int PALE_BLUE = Color.rgb(228,238,247), BACKGROUND = Color.rgb(243,247,251), DIVIDER = Color.rgb(211,223,233);
     final ArrayList<Task> tasks = new ArrayList<>();
-    LinearLayout list; TextView title, subtitle; LocalDate shown;
+    LinearLayout list; TextView title, subtitle; Button todayButton, tomorrowButton; LocalDate shown;
     android.content.SharedPreferences prefs;
 
     static class Task {
@@ -30,25 +29,26 @@ public class MainActivity extends Activity {
     TextView text(String s,int sp,int color){ TextView v=new TextView(this);v.setText(s);v.setTextSize(sp);v.setTextColor(color);v.setGravity(Gravity.CENTER_VERTICAL);return v; }
     GradientDrawable bg(int color,int radius){GradientDrawable g=new GradientDrawable();g.setColor(color);g.setCornerRadius(dp(radius));return g;}
     void build(){
-        LinearLayout root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);root.setPadding(dp(22),dp(18),dp(22),dp(18));root.setBackgroundColor(Color.rgb(247,244,237));
+        LinearLayout root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);root.setPadding(dp(22),dp(18),dp(22),dp(18));root.setBackgroundColor(BACKGROUND);
         root.setOnApplyWindowInsetsListener((view,insets)->{
             view.setPadding(dp(22)+insets.getSystemWindowInsetLeft(),dp(18)+insets.getSystemWindowInsetTop(),dp(22)+insets.getSystemWindowInsetRight(),dp(18)+insets.getSystemWindowInsetBottom());
             return insets;
         });
         LinearLayout nav=new LinearLayout(this);nav.setGravity(Gravity.CENTER_VERTICAL);
-        Button back=new Button(this);back.setText("‹");back.setTextSize(25);back.setOnClickListener(v->{shown=shown.minusDays(1);render();});
-        LinearLayout heads=new LinearLayout(this);heads.setOrientation(LinearLayout.VERTICAL);heads.setPadding(dp(10),0,dp(10),0);
-        title=text("",27,INK);title.setTypeface(Typeface.DEFAULT,Typeface.BOLD); subtitle=text("",14,MUTED);heads.addView(title);heads.addView(subtitle);
-        Button forward=new Button(this);forward.setText("›");forward.setTextSize(25);forward.setOnClickListener(v->{shown=shown.plusDays(1);render();});
+        Button back=new Button(this);back.setText("‹");back.setTextSize(25);back.setTextColor(BLUE);back.setBackground(bg(PALE_BLUE,14));back.setOnClickListener(v->{shown=shown.minusDays(1);render();});
+        LinearLayout heads=new LinearLayout(this);heads.setOrientation(LinearLayout.VERTICAL);heads.setGravity(Gravity.CENTER);heads.setPadding(dp(10),0,dp(10),0);
+        title=text("",27,INK);title.setTypeface(Typeface.DEFAULT,Typeface.BOLD);title.setGravity(Gravity.CENTER);subtitle=text("",14,MUTED);subtitle.setGravity(Gravity.CENTER);heads.addView(title);heads.addView(subtitle);
+        Button forward=new Button(this);forward.setText("›");forward.setTextSize(25);forward.setTextColor(BLUE);forward.setBackground(bg(PALE_BLUE,14));forward.setOnClickListener(v->{shown=shown.plusDays(1);render();});
         nav.addView(back,new LinearLayout.LayoutParams(dp(50),dp(50)));nav.addView(heads,new LinearLayout.LayoutParams(0,dp(66),1));nav.addView(forward,new LinearLayout.LayoutParams(dp(50),dp(50)));root.addView(nav);
         LinearLayout quick=new LinearLayout(this);quick.setGravity(Gravity.CENTER);quick.setPadding(0,dp(6),0,dp(12));
-        Button today=new Button(this);today.setText("Today");today.setOnClickListener(v->{shown=LocalDate.now();render();});Button tomorrow=new Button(this);tomorrow.setText("Tomorrow");tomorrow.setOnClickListener(v->{shown=LocalDate.now().plusDays(1);render();});quick.addView(today);quick.addView(tomorrow);root.addView(quick);
+        todayButton=new Button(this);todayButton.setText("Today");todayButton.setOnClickListener(v->{shown=LocalDate.now();render();});tomorrowButton=new Button(this);tomorrowButton.setText("Tomorrow");tomorrowButton.setOnClickListener(v->{shown=LocalDate.now().plusDays(1);render();});quick.addView(todayButton);quick.addView(tomorrowButton);root.addView(quick);
         ScrollView scroll=new ScrollView(this);list=new LinearLayout(this);list.setOrientation(LinearLayout.VERTICAL);scroll.addView(list);root.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
-        Button add=new Button(this);add.setText("＋  Add a task");add.setTextSize(17);add.setTextColor(Color.WHITE);add.setBackground(bg(GREEN,16));add.setOnClickListener(v->addDialog());root.addView(add,new LinearLayout.LayoutParams(-1,dp(58)));setContentView(root);
+        Button add=new Button(this);add.setText("＋  Add a task");add.setTextSize(17);add.setTextColor(Color.WHITE);add.setBackground(bg(BLUE,16));add.setOnClickListener(v->addDialog());root.addView(add,new LinearLayout.LayoutParams(-1,dp(58)));setContentView(root);
     }
     void render(){
         LocalDate now=LocalDate.now();title.setText(shown.equals(now)?"Today":shown.equals(now.plusDays(1))?"Tomorrow":shown.format(DateTimeFormatter.ofPattern("EEEE")));
         subtitle.setText(shown.format(DateTimeFormatter.ofPattern("d MMMM yyyy")));list.removeAllViews();
+        styleDayButton(todayButton,shown.equals(now));styleDayButton(tomorrowButton,shown.equals(now.plusDays(1)));
         boolean any=false;for(Task t:tasks)if(t.date.equals(shown.toString())){addTaskRow(t);any=true;}
         if(shown.equals(now)){
             ArrayList<Task> old=new ArrayList<>();for(Task t:tasks)if(!t.done&&LocalDate.parse(t.date).isBefore(now)&&!carried(t.id,now))old.add(t);
@@ -56,16 +56,17 @@ public class MainActivity extends Activity {
         }
         if(!any){TextView empty=text("Nothing planned yet.\nEnjoy the space — or add a task below.",16,MUTED);empty.setGravity(Gravity.CENTER);empty.setPadding(0,dp(80),0,0);list.addView(empty,new LinearLayout.LayoutParams(-1,dp(180)));}
     }
+    void styleDayButton(Button button,boolean selected){button.setTextColor(selected?Color.WHITE:BLUE);button.setBackground(bg(selected?BLUE:PALE_BLUE,14));}
     boolean carried(long source,LocalDate day){for(Task t:tasks)if(t.source==source&&t.date.equals(day.toString()))return true;return false;}
     void addTaskRow(Task t){
         LinearLayout row=new LinearLayout(this);row.setGravity(Gravity.CENTER_VERTICAL);row.setPadding(dp(6),dp(5),0,dp(5));
-        CheckBox cb=new CheckBox(this);cb.setChecked(t.done);cb.setButtonTintList(new android.content.res.ColorStateList(new int[][]{new int[]{android.R.attr.state_checked},new int[]{}},new int[]{GREEN,MUTED}));
+        CheckBox cb=new CheckBox(this);cb.setChecked(t.done);cb.setButtonTintList(new android.content.res.ColorStateList(new int[][]{new int[]{android.R.attr.state_checked},new int[]{}},new int[]{BLUE,MUTED}));
         TextView label=text(t.text,17,t.done?MUTED:INK);if(t.done)label.setPaintFlags(label.getPaintFlags()|android.graphics.Paint.STRIKE_THRU_TEXT_FLAG);label.setPadding(dp(6),0,dp(4),0);
         cb.setOnCheckedChangeListener((b,x)->{t.done=x;save();render();});label.setOnLongClickListener(v->{deleteDialog(t);return true;});row.addView(cb,new LinearLayout.LayoutParams(dp(48),dp(52)));row.addView(label,new LinearLayout.LayoutParams(0,dp(52),1));list.addView(row);
-        View line=new View(this);line.setBackgroundColor(Color.rgb(224,221,213));list.addView(line,new LinearLayout.LayoutParams(-1,dp(1)));
+        View line=new View(this);line.setBackgroundColor(DIVIDER);list.addView(line,new LinearLayout.LayoutParams(-1,dp(1)));
     }
     void addCarryRow(Task old){
-        LinearLayout row=new LinearLayout(this);row.setGravity(Gravity.CENTER_VERTICAL);row.setPadding(dp(8),0,0,0);TextView plus=text("＋",23,GREEN);TextView label=text(old.text,16,Color.rgb(145,148,145));label.setPadding(dp(8),0,0,0);row.addView(plus,new LinearLayout.LayoutParams(dp(42),dp(52)));row.addView(label,new LinearLayout.LayoutParams(0,dp(52),1));row.setOnClickListener(v->{tasks.add(new Task(System.currentTimeMillis(),old.text,LocalDate.now().toString(),false,old.id));save();render();});list.addView(row);
+        LinearLayout row=new LinearLayout(this);row.setGravity(Gravity.CENTER_VERTICAL);row.setPadding(dp(8),0,0,0);TextView plus=text("＋",23,BLUE);TextView label=text(old.text,16,Color.rgb(137,153,168));label.setPadding(dp(8),0,0,0);row.addView(plus,new LinearLayout.LayoutParams(dp(42),dp(52)));row.addView(label,new LinearLayout.LayoutParams(0,dp(52),1));row.setOnClickListener(v->{tasks.add(new Task(System.currentTimeMillis(),old.text,LocalDate.now().toString(),false,old.id));save();render();});list.addView(row);
     }
     void addDialog(){
         LinearLayout box=new LinearLayout(this);box.setPadding(dp(24),dp(8),dp(24),0);box.setOrientation(LinearLayout.VERTICAL);EditText input=new EditText(this);input.setHint("What needs doing?");input.setSingleLine(true);box.addView(input);RadioGroup group=new RadioGroup(this);group.setOrientation(RadioGroup.HORIZONTAL);RadioButton cur=new RadioButton(this);cur.setText(shown.equals(LocalDate.now().plusDays(1))?"Tomorrow":shown.equals(LocalDate.now())?"Today":shown.format(DateTimeFormatter.ofPattern("EEE d MMM")));cur.setId(1);cur.setChecked(true);RadioButton next=new RadioButton(this);next.setText("Next day");next.setId(2);group.addView(cur);group.addView(next);box.addView(group);
