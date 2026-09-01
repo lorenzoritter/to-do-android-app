@@ -1,0 +1,19 @@
+# Android Studio / Gradle
+.gradle/
+.idea/
+*.iml
+local.properties
+**/build/
+build*/
+
+# Locally downloaded Android tooling and release artifacts
+android-sdk/
+*.apk
+*.aab
+*.keystore
+*.jks
+*.idsig
+
+# OS files
+.DS_Store
+Thumbs.db
