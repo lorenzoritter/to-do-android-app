@@ -9,6 +9,16 @@ and the version numbers match the Android app's `versionName`.
 
 ## [Unreleased]
 
+## [1.3] - 2026-09-02
+
+### Added
+
+- Opened an edit dialog by tapping a task's text, with the existing text ready
+  to update.
+- Deleted tasks by swiping them to the left, with a visible delete affordance.
+- Added a temporary bottom undo bar that restores the most recently deleted
+  task for a few seconds.
+
 ## [1.2] - 2026-09-01
 
 ### Changed

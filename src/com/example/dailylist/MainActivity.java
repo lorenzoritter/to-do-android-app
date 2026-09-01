@@ -2,6 +2,8 @@ package com.example.dailylist;
 
 import android.app.*;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
@@ -15,8 +17,11 @@ import java.util.*;
 public class MainActivity extends Activity {
     static final int INK = Color.rgb(22,42,58), MUTED = Color.rgb(103,124,142), BLUE = Color.rgb(35,88,140);
     static final int PALE_BLUE = Color.rgb(228,238,247), BACKGROUND = Color.rgb(243,247,251), DIVIDER = Color.rgb(211,223,233);
+    static final int DELETE = Color.rgb(183,55,55);
     final ArrayList<Task> tasks = new ArrayList<>();
-    LinearLayout list; TextView title, subtitle; Button todayButton, tomorrowButton; LocalDate shown;
+    final Handler handler = new Handler(Looper.getMainLooper());
+    LinearLayout root, list, undoBar; TextView title, subtitle; Button todayButton, tomorrowButton, addButton; LocalDate shown;
+    Task pendingDeletedTask; int pendingDeletedIndex = -1; Runnable dismissUndo;
     android.content.SharedPreferences prefs;
 
     static class Task {
@@ -24,12 +29,49 @@ public class MainActivity extends Activity {
         Task(long i,String t,String d,boolean x,long s){id=i;text=t;date=d;done=x;source=s;}
     }
 
+    class SwipeTaskRow extends LinearLayout {
+        final Task task; final int touchSlop; float downX, downY; boolean swiping;
+        SwipeTaskRow(Task t){
+            super(MainActivity.this);task=t;touchSlop=ViewConfiguration.get(MainActivity.this).getScaledTouchSlop();
+            setOrientation(LinearLayout.HORIZONTAL);setGravity(Gravity.CENTER_VERTICAL);setPadding(dp(6),dp(5),0,dp(5));setBackgroundColor(BACKGROUND);setClickable(true);
+        }
+        @Override public boolean onInterceptTouchEvent(MotionEvent event){
+            if(event.getActionMasked()==MotionEvent.ACTION_DOWN){downX=event.getX();downY=event.getY();swiping=false;animate().cancel();return false;}
+            if(event.getActionMasked()==MotionEvent.ACTION_MOVE){
+                float dx=event.getX()-downX,dy=event.getY()-downY;
+                if(dx < -touchSlop && Math.abs(dx) > Math.abs(dy)*1.2f){swiping=true;getParent().requestDisallowInterceptTouchEvent(true);return true;}
+            }
+            return false;
+        }
+        @Override public boolean onTouchEvent(MotionEvent event){
+            switch(event.getActionMasked()){
+                case MotionEvent.ACTION_DOWN:
+                    downX=event.getX();downY=event.getY();swiping=false;return true;
+                case MotionEvent.ACTION_MOVE:
+                    float dx=event.getX()-downX,dy=event.getY()-downY;
+                    if(!swiping && dx < -touchSlop && Math.abs(dx) > Math.abs(dy)*1.2f){swiping=true;getParent().requestDisallowInterceptTouchEvent(true);}
+                    if(swiping){float offset=Math.min(0,dx);setTranslationX(offset);setAlpha(Math.max(.55f,1f-Math.abs(offset)/Math.max(1f,getWidth()*1.5f)));}
+                    return true;
+                case MotionEvent.ACTION_UP:
+                    getParent().requestDisallowInterceptTouchEvent(false);
+                    if(swiping && -getTranslationX() >= Math.max(dp(72),getWidth()*.25f)){
+                        animate().translationX(-getWidth()).alpha(0f).setDuration(160).withEndAction(()->deleteTaskWithUndo(task)).start();
+                    }else resetPosition();
+                    swiping=false;return true;
+                case MotionEvent.ACTION_CANCEL:
+                    getParent().requestDisallowInterceptTouchEvent(false);resetPosition();swiping=false;return true;
+            }
+            return super.onTouchEvent(event);
+        }
+        void resetPosition(){animate().translationX(0).alpha(1f).setDuration(160).start();}
+    }
+
     @Override public void onCreate(Bundle b){ super.onCreate(b); prefs=getSharedPreferences("daily",MODE_PRIVATE); load(); shown=LocalDate.now(); build(); render(); }
     int dp(int n){ return (int)(n*getResources().getDisplayMetrics().density+.5f); }
     TextView text(String s,int sp,int color){ TextView v=new TextView(this);v.setText(s);v.setTextSize(sp);v.setTextColor(color);v.setGravity(Gravity.CENTER_VERTICAL);return v; }
     GradientDrawable bg(int color,int radius){GradientDrawable g=new GradientDrawable();g.setColor(color);g.setCornerRadius(dp(radius));return g;}
     void build(){
-        LinearLayout root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);root.setPadding(dp(22),dp(18),dp(22),dp(18));root.setBackgroundColor(BACKGROUND);
+        root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);root.setPadding(dp(22),dp(18),dp(22),dp(18));root.setBackgroundColor(BACKGROUND);
         root.setOnApplyWindowInsetsListener((view,insets)->{
             view.setPadding(dp(22)+insets.getSystemWindowInsetLeft(),dp(18)+insets.getSystemWindowInsetTop(),dp(22)+insets.getSystemWindowInsetRight(),dp(18)+insets.getSystemWindowInsetBottom());
             return insets;
@@ -43,7 +85,7 @@ public class MainActivity extends Activity {
         LinearLayout quick=new LinearLayout(this);quick.setGravity(Gravity.CENTER);quick.setPadding(0,dp(6),0,dp(12));
         todayButton=new Button(this);todayButton.setText("Today");todayButton.setOnClickListener(v->{shown=LocalDate.now();render();});tomorrowButton=new Button(this);tomorrowButton.setText("Tomorrow");tomorrowButton.setOnClickListener(v->{shown=LocalDate.now().plusDays(1);render();});quick.addView(todayButton);quick.addView(tomorrowButton);root.addView(quick);
         ScrollView scroll=new ScrollView(this);list=new LinearLayout(this);list.setOrientation(LinearLayout.VERTICAL);scroll.addView(list);root.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
-        Button add=new Button(this);add.setText("＋  Add a task");add.setTextSize(17);add.setTextColor(Color.WHITE);add.setBackground(bg(BLUE,16));add.setOnClickListener(v->addDialog());root.addView(add,new LinearLayout.LayoutParams(-1,dp(58)));setContentView(root);
+        addButton=new Button(this);addButton.setText("＋  Add a task");addButton.setTextSize(17);addButton.setTextColor(Color.WHITE);addButton.setBackground(bg(BLUE,16));addButton.setOnClickListener(v->addDialog());root.addView(addButton,new LinearLayout.LayoutParams(-1,dp(58)));setContentView(root);
     }
     void render(){
         LocalDate now=LocalDate.now();title.setText(shown.equals(now)?"Today":shown.equals(now.plusDays(1))?"Tomorrow":shown.format(DateTimeFormatter.ofPattern("EEEE")));
@@ -59,10 +101,12 @@ public class MainActivity extends Activity {
     void styleDayButton(Button button,boolean selected){button.setTextColor(selected?Color.WHITE:BLUE);button.setBackground(bg(selected?BLUE:PALE_BLUE,14));}
     boolean carried(long source,LocalDate day){for(Task t:tasks)if(t.source==source&&t.date.equals(day.toString()))return true;return false;}
     void addTaskRow(Task t){
-        LinearLayout row=new LinearLayout(this);row.setGravity(Gravity.CENTER_VERTICAL);row.setPadding(dp(6),dp(5),0,dp(5));
+        FrameLayout swipeLayer=new FrameLayout(this);TextView deleteHint=text("Delete",14,Color.WHITE);deleteHint.setGravity(Gravity.CENTER);deleteHint.setTypeface(Typeface.DEFAULT,Typeface.BOLD);deleteHint.setBackgroundColor(DELETE);
+        FrameLayout.LayoutParams deleteParams=new FrameLayout.LayoutParams(dp(92),-1,Gravity.END);swipeLayer.addView(deleteHint,deleteParams);
+        SwipeTaskRow row=new SwipeTaskRow(t);
         CheckBox cb=new CheckBox(this);cb.setChecked(t.done);cb.setButtonTintList(new android.content.res.ColorStateList(new int[][]{new int[]{android.R.attr.state_checked},new int[]{}},new int[]{BLUE,MUTED}));
         TextView label=text(t.text,17,t.done?MUTED:INK);if(t.done)label.setPaintFlags(label.getPaintFlags()|android.graphics.Paint.STRIKE_THRU_TEXT_FLAG);label.setPadding(dp(6),0,dp(4),0);
-        cb.setOnCheckedChangeListener((b,x)->{t.done=x;save();render();});label.setOnLongClickListener(v->{deleteDialog(t);return true;});row.addView(cb,new LinearLayout.LayoutParams(dp(48),dp(52)));row.addView(label,new LinearLayout.LayoutParams(0,dp(52),1));list.addView(row);
+        cb.setOnCheckedChangeListener((b,x)->{t.done=x;save();render();});label.setOnClickListener(v->editDialog(t));label.setOnLongClickListener(v->{deleteDialog(t);return true;});row.addView(cb,new LinearLayout.LayoutParams(dp(48),dp(52)));row.addView(label,new LinearLayout.LayoutParams(0,dp(52),1));swipeLayer.addView(row,new FrameLayout.LayoutParams(-1,-1));list.addView(swipeLayer,new LinearLayout.LayoutParams(-1,dp(62)));
         View line=new View(this);line.setBackgroundColor(DIVIDER);list.addView(line,new LinearLayout.LayoutParams(-1,dp(1)));
     }
     void addCarryRow(Task old){
@@ -72,7 +116,25 @@ public class MainActivity extends Activity {
         LinearLayout box=new LinearLayout(this);box.setPadding(dp(24),dp(8),dp(24),0);box.setOrientation(LinearLayout.VERTICAL);EditText input=new EditText(this);input.setHint("What needs doing?");input.setSingleLine(true);box.addView(input);RadioGroup group=new RadioGroup(this);group.setOrientation(RadioGroup.HORIZONTAL);RadioButton cur=new RadioButton(this);cur.setText(shown.equals(LocalDate.now().plusDays(1))?"Tomorrow":shown.equals(LocalDate.now())?"Today":shown.format(DateTimeFormatter.ofPattern("EEE d MMM")));cur.setId(1);cur.setChecked(true);RadioButton next=new RadioButton(this);next.setText("Next day");next.setId(2);group.addView(cur);group.addView(next);box.addView(group);
         AlertDialog d=new AlertDialog.Builder(this).setTitle("New task").setView(box).setNegativeButton("Cancel",null).setPositiveButton("Add",null).create();d.setOnShowListener(x->{d.getButton(-1).setOnClickListener(v->{String s=input.getText().toString().trim();if(s.isEmpty()){input.setError("Enter a task");return;}LocalDate date=group.getCheckedRadioButtonId()==2?shown.plusDays(1):shown;tasks.add(new Task(System.currentTimeMillis(),s,date.toString(),false,0));save();d.dismiss();render();});input.requestFocus();d.getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE);});d.show();
     }
-    void deleteDialog(Task t){new AlertDialog.Builder(this).setTitle("Delete task?").setMessage(t.text).setNegativeButton("Cancel",null).setPositiveButton("Delete",(d,w)->{tasks.remove(t);save();render();}).show();}
+    void editDialog(Task t){
+        EditText input=new EditText(this);input.setSingleLine(true);input.setText(t.text);input.setSelectAllOnFocus(true);LinearLayout box=new LinearLayout(this);box.setPadding(dp(24),dp(8),dp(24),0);box.addView(input,new LinearLayout.LayoutParams(-1,-2));
+        AlertDialog d=new AlertDialog.Builder(this).setTitle("Edit task").setView(box).setNegativeButton("Cancel",null).setPositiveButton("Save",null).create();d.setOnShowListener(x->{d.getButton(-1).setOnClickListener(v->{String s=input.getText().toString().trim();if(s.isEmpty()){input.setError("Enter a task");return;}t.text=s;save();d.dismiss();render();});input.requestFocus();d.getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE);});d.show();
+    }
+    void deleteDialog(Task t){new AlertDialog.Builder(this).setTitle("Delete task?").setMessage(t.text).setNegativeButton("Cancel",null).setPositiveButton("Delete",(d,w)->deleteTaskWithUndo(t)).show();}
+    void deleteTaskWithUndo(Task t){int index=tasks.indexOf(t);if(index<0)return;tasks.remove(index);save();render();showUndo(t,index);}
+    void showUndo(Task task,int index){
+        if(dismissUndo!=null)handler.removeCallbacks(dismissUndo);pendingDeletedTask=task;pendingDeletedIndex=index;
+        if(undoBar==null){
+            undoBar=new LinearLayout(this);undoBar.setGravity(Gravity.CENTER_VERTICAL);undoBar.setPadding(dp(18),0,dp(10),0);undoBar.setBackground(bg(INK,14));TextView message=text("Task deleted",15,Color.WHITE);TextView undo=text("UNDO",14,PALE_BLUE);undo.setTypeface(Typeface.DEFAULT,Typeface.BOLD);undo.setGravity(Gravity.CENTER);undo.setPadding(dp(18),0,dp(8),0);undo.setClickable(true);undo.setFocusable(true);undo.setOnClickListener(v->undoDelete());undoBar.addView(message,new LinearLayout.LayoutParams(0,-1,1));undoBar.addView(undo,new LinearLayout.LayoutParams(dp(84),-1));
+        }
+        if(undoBar.getParent()==null){LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(-1,dp(52));p.setMargins(0,dp(8),0,dp(8));root.addView(undoBar,root.indexOfChild(addButton),p);undoBar.setAlpha(0f);undoBar.setTranslationY(dp(10));undoBar.animate().alpha(1f).translationY(0).setDuration(140).start();}
+        dismissUndo=()->{pendingDeletedTask=null;pendingDeletedIndex=-1;hideUndo();};handler.postDelayed(dismissUndo,4500);
+    }
+    void undoDelete(){
+        if(pendingDeletedTask==null)return;if(dismissUndo!=null)handler.removeCallbacks(dismissUndo);int index=Math.max(0,Math.min(pendingDeletedIndex,tasks.size()));tasks.add(index,pendingDeletedTask);pendingDeletedTask=null;pendingDeletedIndex=-1;save();render();hideUndo();
+    }
+    void hideUndo(){if(undoBar!=null&&undoBar.getParent()!=null){undoBar.animate().cancel();root.removeView(undoBar);}}
+    @Override protected void onDestroy(){if(dismissUndo!=null)handler.removeCallbacks(dismissUndo);super.onDestroy();}
     void load(){try{JSONArray a=new JSONArray(prefs.getString("tasks","[]"));for(int i=0;i<a.length();i++){JSONObject o=a.getJSONObject(i);tasks.add(new Task(o.getLong("id"),o.getString("text"),o.getString("date"),o.optBoolean("done"),o.optLong("source")));}}catch(Exception ignored){}}
     void save(){JSONArray a=new JSONArray();try{for(Task t:tasks){JSONObject o=new JSONObject();o.put("id",t.id);o.put("text",t.text);o.put("date",t.date);o.put("done",t.done);o.put("source",t.source);a.put(o);}}catch(Exception ignored){}prefs.edit().putString("tasks",a.toString()).apply();}
 }
