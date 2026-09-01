@@ -3,7 +3,7 @@
 A small, private, offline Android day planner. It uses only Android platform APIs and stores its data in the app's private on-device preferences.
 
 - Check off tasks for any day.
-- Tap a task's text to edit it.
+- Tap a task's text to edit it directly in the list.
 - Swipe a task left to delete it; use the temporary bottom bar to undo.
 - Add a task to the displayed day or its following day.
 - Unfinished tasks from earlier days appear greyed out on Today; tap one to copy it into Today.

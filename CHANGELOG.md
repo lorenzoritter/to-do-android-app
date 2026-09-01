@@ -9,6 +9,14 @@ and the version numbers match the Android app's `versionName`.
 
 ## [Unreleased]
 
+## [1.4] - 2026-09-02
+
+### Changed
+
+- Replaced the task-editing dialog with inline editing in the list. Changes save
+  when the keyboard's Done action is used, another part of the app is tapped,
+  or the app is left.
+
 ## [1.3] - 2026-09-02
 
 ### Added

@@ -5,9 +5,12 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.graphics.Color;
+import android.graphics.Rect;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.view.*;
+import android.view.inputmethod.EditorInfo;
+import android.view.inputmethod.InputMethodManager;
 import android.widget.*;
 import org.json.*;
 import java.time.*;
@@ -22,6 +25,7 @@ public class MainActivity extends Activity {
     final Handler handler = new Handler(Looper.getMainLooper());
     LinearLayout root, list, undoBar; TextView title, subtitle; Button todayButton, tomorrowButton, addButton; LocalDate shown;
     Task pendingDeletedTask; int pendingDeletedIndex = -1; Runnable dismissUndo;
+    EditText activeEditor; Task activeEditTask;
     android.content.SharedPreferences prefs;
 
     static class Task {
@@ -67,6 +71,10 @@ public class MainActivity extends Activity {
     }
 
     @Override public void onCreate(Bundle b){ super.onCreate(b); prefs=getSharedPreferences("daily",MODE_PRIVATE); load(); shown=LocalDate.now(); build(); render(); }
+    @Override public boolean dispatchTouchEvent(MotionEvent event){
+        if(event.getActionMasked()==MotionEvent.ACTION_DOWN&&activeEditor!=null){Rect bounds=new Rect();activeEditor.getGlobalVisibleRect(bounds);if(!bounds.contains((int)event.getRawX(),(int)event.getRawY()))finishInlineEdit();}
+        return super.dispatchTouchEvent(event);
+    }
     int dp(int n){ return (int)(n*getResources().getDisplayMetrics().density+.5f); }
     TextView text(String s,int sp,int color){ TextView v=new TextView(this);v.setText(s);v.setTextSize(sp);v.setTextColor(color);v.setGravity(Gravity.CENTER_VERTICAL);return v; }
     GradientDrawable bg(int color,int radius){GradientDrawable g=new GradientDrawable();g.setColor(color);g.setCornerRadius(dp(radius));return g;}
@@ -105,8 +113,8 @@ public class MainActivity extends Activity {
         FrameLayout.LayoutParams deleteParams=new FrameLayout.LayoutParams(dp(92),-1,Gravity.END);swipeLayer.addView(deleteHint,deleteParams);
         SwipeTaskRow row=new SwipeTaskRow(t);
         CheckBox cb=new CheckBox(this);cb.setChecked(t.done);cb.setButtonTintList(new android.content.res.ColorStateList(new int[][]{new int[]{android.R.attr.state_checked},new int[]{}},new int[]{BLUE,MUTED}));
-        TextView label=text(t.text,17,t.done?MUTED:INK);if(t.done)label.setPaintFlags(label.getPaintFlags()|android.graphics.Paint.STRIKE_THRU_TEXT_FLAG);label.setPadding(dp(6),0,dp(4),0);
-        cb.setOnCheckedChangeListener((b,x)->{t.done=x;save();render();});label.setOnClickListener(v->editDialog(t));label.setOnLongClickListener(v->{deleteDialog(t);return true;});row.addView(cb,new LinearLayout.LayoutParams(dp(48),dp(52)));row.addView(label,new LinearLayout.LayoutParams(0,dp(52),1));swipeLayer.addView(row,new FrameLayout.LayoutParams(-1,-1));list.addView(swipeLayer,new LinearLayout.LayoutParams(-1,dp(62)));
+        EditText label=new EditText(this);label.setText(t.text);label.setTextSize(17);label.setTextColor(t.done?MUTED:INK);label.setGravity(Gravity.CENTER_VERTICAL);label.setSingleLine(true);label.setImeOptions(EditorInfo.IME_ACTION_DONE);label.setPadding(dp(6),0,dp(4),0);label.setBackgroundColor(Color.TRANSPARENT);label.setFocusable(false);label.setCursorVisible(false);if(t.done)label.setPaintFlags(label.getPaintFlags()|android.graphics.Paint.STRIKE_THRU_TEXT_FLAG);
+        cb.setOnCheckedChangeListener((b,x)->{t.done=x;save();render();});label.setOnClickListener(v->beginInlineEdit(label,t));label.setOnLongClickListener(v->{if(activeEditor==label)return false;deleteDialog(t);return true;});label.setOnEditorActionListener((v,action,event)->{if(action==EditorInfo.IME_ACTION_DONE){finishInlineEdit();return true;}return false;});label.setOnFocusChangeListener((v,focused)->{if(!focused&&activeEditor==label)finishInlineEdit();});row.addView(cb,new LinearLayout.LayoutParams(dp(48),dp(52)));row.addView(label,new LinearLayout.LayoutParams(0,dp(52),1));swipeLayer.addView(row,new FrameLayout.LayoutParams(-1,-1));list.addView(swipeLayer,new LinearLayout.LayoutParams(-1,dp(62)));
         View line=new View(this);line.setBackgroundColor(DIVIDER);list.addView(line,new LinearLayout.LayoutParams(-1,dp(1)));
     }
     void addCarryRow(Task old){
@@ -116,12 +124,14 @@ public class MainActivity extends Activity {
         LinearLayout box=new LinearLayout(this);box.setPadding(dp(24),dp(8),dp(24),0);box.setOrientation(LinearLayout.VERTICAL);EditText input=new EditText(this);input.setHint("What needs doing?");input.setSingleLine(true);box.addView(input);RadioGroup group=new RadioGroup(this);group.setOrientation(RadioGroup.HORIZONTAL);RadioButton cur=new RadioButton(this);cur.setText(shown.equals(LocalDate.now().plusDays(1))?"Tomorrow":shown.equals(LocalDate.now())?"Today":shown.format(DateTimeFormatter.ofPattern("EEE d MMM")));cur.setId(1);cur.setChecked(true);RadioButton next=new RadioButton(this);next.setText("Next day");next.setId(2);group.addView(cur);group.addView(next);box.addView(group);
         AlertDialog d=new AlertDialog.Builder(this).setTitle("New task").setView(box).setNegativeButton("Cancel",null).setPositiveButton("Add",null).create();d.setOnShowListener(x->{d.getButton(-1).setOnClickListener(v->{String s=input.getText().toString().trim();if(s.isEmpty()){input.setError("Enter a task");return;}LocalDate date=group.getCheckedRadioButtonId()==2?shown.plusDays(1):shown;tasks.add(new Task(System.currentTimeMillis(),s,date.toString(),false,0));save();d.dismiss();render();});input.requestFocus();d.getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE);});d.show();
     }
-    void editDialog(Task t){
-        EditText input=new EditText(this);input.setSingleLine(true);input.setText(t.text);input.setSelectAllOnFocus(true);LinearLayout box=new LinearLayout(this);box.setPadding(dp(24),dp(8),dp(24),0);box.addView(input,new LinearLayout.LayoutParams(-1,-2));
-        AlertDialog d=new AlertDialog.Builder(this).setTitle("Edit task").setView(box).setNegativeButton("Cancel",null).setPositiveButton("Save",null).create();d.setOnShowListener(x->{d.getButton(-1).setOnClickListener(v->{String s=input.getText().toString().trim();if(s.isEmpty()){input.setError("Enter a task");return;}t.text=s;save();d.dismiss();render();});input.requestFocus();d.getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE);});d.show();
+    void beginInlineEdit(EditText editor,Task task){
+        if(activeEditor==editor)return;finishInlineEdit();activeEditor=editor;activeEditTask=task;editor.setFocusableInTouchMode(true);editor.setFocusable(true);editor.setCursorVisible(true);editor.setBackground(bg(PALE_BLUE,8));editor.requestFocus();editor.setSelection(editor.getText().length());handler.post(()->{if(activeEditor==editor)((InputMethodManager)getSystemService(INPUT_METHOD_SERVICE)).showSoftInput(editor,InputMethodManager.SHOW_IMPLICIT);});
+    }
+    void finishInlineEdit(){
+        if(activeEditor==null)return;EditText editor=activeEditor;Task task=activeEditTask;String updated=editor.getText().toString().trim();activeEditor=null;activeEditTask=null;if(updated.isEmpty())editor.setText(task.text);else if(!updated.equals(task.text)){task.text=updated;save();}editor.setCursorVisible(false);editor.setBackgroundColor(Color.TRANSPARENT);editor.setFocusable(false);editor.clearFocus();((InputMethodManager)getSystemService(INPUT_METHOD_SERVICE)).hideSoftInputFromWindow(editor.getWindowToken(),0);
     }
     void deleteDialog(Task t){new AlertDialog.Builder(this).setTitle("Delete task?").setMessage(t.text).setNegativeButton("Cancel",null).setPositiveButton("Delete",(d,w)->deleteTaskWithUndo(t)).show();}
-    void deleteTaskWithUndo(Task t){int index=tasks.indexOf(t);if(index<0)return;tasks.remove(index);save();render();showUndo(t,index);}
+    void deleteTaskWithUndo(Task t){if(activeEditTask==t)finishInlineEdit();int index=tasks.indexOf(t);if(index<0)return;tasks.remove(index);save();render();showUndo(t,index);}
     void showUndo(Task task,int index){
         if(dismissUndo!=null)handler.removeCallbacks(dismissUndo);pendingDeletedTask=task;pendingDeletedIndex=index;
         if(undoBar==null){
@@ -134,6 +144,7 @@ public class MainActivity extends Activity {
         if(pendingDeletedTask==null)return;if(dismissUndo!=null)handler.removeCallbacks(dismissUndo);int index=Math.max(0,Math.min(pendingDeletedIndex,tasks.size()));tasks.add(index,pendingDeletedTask);pendingDeletedTask=null;pendingDeletedIndex=-1;save();render();hideUndo();
     }
     void hideUndo(){if(undoBar!=null&&undoBar.getParent()!=null){undoBar.animate().cancel();root.removeView(undoBar);}}
+    @Override protected void onPause(){finishInlineEdit();super.onPause();}
     @Override protected void onDestroy(){if(dismissUndo!=null)handler.removeCallbacks(dismissUndo);super.onDestroy();}
     void load(){try{JSONArray a=new JSONArray(prefs.getString("tasks","[]"));for(int i=0;i<a.length();i++){JSONObject o=a.getJSONObject(i);tasks.add(new Task(o.getLong("id"),o.getString("text"),o.getString("date"),o.optBoolean("done"),o.optLong("source")));}}catch(Exception ignored){}}
     void save(){JSONArray a=new JSONArray();try{for(Task t:tasks){JSONObject o=new JSONObject();o.put("id",t.id);o.put("text",t.text);o.put("date",t.date);o.put("done",t.done);o.put("source",t.source);a.put(o);}}catch(Exception ignored){}prefs.edit().putString("tasks",a.toString()).apply();}
