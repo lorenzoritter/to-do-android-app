@@ -9,6 +9,15 @@ and the version numbers match the Android app's `versionName`.
 
 ## [Unreleased]
 
+## [1.6] - 2026-09-02
+
+### Changed
+
+- Improved long-press reordering with a live insertion preview. Nearby tasks
+  animate aside to show the destination slot while the selected task follows
+  the drag.
+- Parent tasks and their subtasks now preview-move together as one group.
+
 ## [1.5] - 2026-09-02
 
 ### Added
