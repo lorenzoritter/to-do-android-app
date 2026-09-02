@@ -9,6 +9,25 @@ and the version numbers match the Android app's `versionName`.
 
 ## [Unreleased]
 
+## [1.5] - 2026-09-02
+
+### Added
+
+- Reordered tasks by holding a task and dragging it vertically.
+- Created a subtask by holding a task and dragging it to the right; dragging a
+  subtask left promotes it back to a normal task.
+- Carried a task group forward with its unfinished subtasks while leaving
+  completed subtasks behind.
+
+### Changed
+
+- Deleting a parent promotes its subtasks to normal tasks, with Undo restoring
+  the original relationship.
+
+### Removed
+
+- Removed long-press deletion. A quick left swipe remains the delete gesture.
+
 ## [1.4] - 2026-09-02
 
 ### Changed

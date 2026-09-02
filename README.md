@@ -4,10 +4,13 @@ A small, private, offline Android day planner. It uses only Android platform API
 
 - Check off tasks for any day.
 - Tap a task's text to edit it directly in the list.
-- Swipe a task left to delete it; use the temporary bottom bar to undo.
+- Hold a task and drag vertically to reorder it.
+- Hold and drag a task right to make it a subtask; drag a subtask left to
+  promote it back to a normal task.
+- Quickly swipe a task left to delete it; use the temporary bottom bar to undo.
 - Add a task to the displayed day or its following day.
-- Unfinished tasks from earlier days appear greyed out on Today; tap one to copy it into Today.
-- Long-press a normal task for a confirmation before deleting it.
+- Unfinished tasks from earlier days appear greyed out on Today. Carrying a
+  parent forward also carries only its unfinished subtasks.
 - Data stays on the device in the app's private storage.
 
 Requires Android 8.0 or newer.
