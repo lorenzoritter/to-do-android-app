@@ -13,6 +13,7 @@ A small, private, offline Android day planner. It uses only Android platform API
 - Unfinished tasks from earlier days appear greyed out on Today. Carrying a
   parent forward also carries only its unfinished subtasks.
 - Data stays on the device in the app's private storage.
+- The installed app version and Android build code appear in a subtle footer.
 
 Requires Android 8.0 or newer.
 
