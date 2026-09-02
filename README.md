@@ -4,7 +4,8 @@ A small, private, offline Android day planner. It uses only Android platform API
 
 - Check off tasks for any day.
 - Tap a task's text to edit it directly in the list.
-- Hold a task and drag vertically to reorder it.
+- Hold a task and drag vertically to reorder it; nearby tasks animate aside to
+  show exactly where it will be placed.
 - Hold and drag a task right to make it a subtask; drag a subtask left to
   promote it back to a normal task.
 - Quickly swipe a task left to delete it; use the temporary bottom bar to undo.
