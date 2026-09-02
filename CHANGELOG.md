@@ -9,6 +9,13 @@ and the version numbers match the Android app's `versionName`.
 
 ## [Unreleased]
 
+## [1.6] - 2026-09-02
+
+### Added
+
+- Displayed the human-readable app version and Android version code in a subtle
+  footer below the Add task button.
+
 ## [1.5.1] - 2026-09-02
 
 ### Changed
