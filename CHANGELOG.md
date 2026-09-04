@@ -9,6 +9,13 @@ and the version numbers match the Android app's `versionName`.
 
 ## [Unreleased]
 
+## [1.6.1] - 2026-09-04
+
+### Fixed
+
+- Stopped older incomplete tasks from being suggested again after a carried
+  copy was completed on a later day.
+
 ## [1.6] - 2026-09-02
 
 ### Added

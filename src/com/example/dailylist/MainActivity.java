@@ -126,7 +126,7 @@ public class MainActivity extends Activity {
         styleDayButton(todayButton,shown.equals(now));styleDayButton(tomorrowButton,shown.equals(now.plusDays(1)));
         boolean any=false;for(Task t:tasks)if(t.date.equals(shown.toString())){addTaskRow(t);any=true;}
         if(shown.equals(now)){
-            ArrayList<Task> old=new ArrayList<>();for(Task t:tasks)if(!isSubtask(t)&&LocalDate.parse(t.date).isBefore(now)&&needsCarry(t)&&!carried(t.id,now))old.add(t);
+            ArrayList<Task> old=new ArrayList<>();for(Task t:tasks)if(!isSubtask(t)&&LocalDate.parse(t.date).isBefore(now)&&needsCarry(t)&&!hasCarrySuccessor(t))old.add(t);
             if(!old.isEmpty()){ TextView h=text("FROM PREVIOUS DAYS",12,MUTED);h.setTypeface(Typeface.DEFAULT,Typeface.BOLD);h.setPadding(dp(4),dp(26),0,dp(8));list.addView(h);for(Task t:old)addCarryGroup(t);any=true; }
         }
         if(!any){TextView empty=text("Nothing planned yet.\nEnjoy the space — or add a task below.",16,MUTED);empty.setGravity(Gravity.CENTER);empty.setPadding(0,dp(80),0,0);list.addView(empty,new LinearLayout.LayoutParams(-1,dp(180)));}
@@ -136,8 +136,8 @@ public class MainActivity extends Activity {
     boolean isSubtask(Task t){Task parent=findTask(t.parent);return t.parent!=0&&parent!=null&&parent.date.equals(t.date);}
     ArrayList<Task> subtasks(Task parent,boolean incompleteOnly){ArrayList<Task> result=new ArrayList<>();for(Task t:tasks)if(t.parent==parent.id&&t.date.equals(parent.date)&&(!incompleteOnly||!t.done))result.add(t);return result;}
     boolean needsCarry(Task parent){return !parent.done||!subtasks(parent,true).isEmpty();}
+    boolean hasCarrySuccessor(Task task){for(Task t:tasks)if(t.source==task.id)return true;return false;}
     long newTaskId(){long id=System.currentTimeMillis();while(findTask(id)!=null)id++;return id;}
-    boolean carried(long source,LocalDate day){for(Task t:tasks)if(t.source==source&&t.date.equals(day.toString()))return true;return false;}
     void addTaskRow(Task t){
         FrameLayout swipeLayer=new FrameLayout(this);swipeLayer.setTag(t);TextView deleteHint=text("Delete",14,Color.WHITE);deleteHint.setGravity(Gravity.CENTER);deleteHint.setTypeface(Typeface.DEFAULT,Typeface.BOLD);deleteHint.setBackgroundColor(DELETE);
         FrameLayout.LayoutParams deleteParams=new FrameLayout.LayoutParams(dp(92),-1,Gravity.END);swipeLayer.addView(deleteHint,deleteParams);
