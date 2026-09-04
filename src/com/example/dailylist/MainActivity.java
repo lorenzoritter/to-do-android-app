@@ -2,8 +2,10 @@ package com.example.dailylist;
 
 import android.app.*;
 import android.os.Bundle;
+import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
+import android.content.pm.PackageInfo;
 import android.graphics.Color;
 import android.graphics.Rect;
 import android.graphics.Typeface;
@@ -97,6 +99,9 @@ public class MainActivity extends Activity {
     int dp(int n){ return (int)(n*getResources().getDisplayMetrics().density+.5f); }
     TextView text(String s,int sp,int color){ TextView v=new TextView(this);v.setText(s);v.setTextSize(sp);v.setTextColor(color);v.setGravity(Gravity.CENTER_VERTICAL);return v; }
     GradientDrawable bg(int color,int radius){GradientDrawable g=new GradientDrawable();g.setColor(color);g.setCornerRadius(dp(radius));return g;}
+    String versionLabel(){
+        try{PackageInfo info=getPackageManager().getPackageInfo(getPackageName(),0);long code=Build.VERSION.SDK_INT>=28?info.getLongVersionCode():info.versionCode;return "Daily List "+info.versionName+" · build "+code;}catch(Exception ignored){return "Daily List";}
+    }
     void build(){
         root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);root.setPadding(dp(22),dp(18),dp(22),dp(18));root.setBackgroundColor(BACKGROUND);
         root.setOnApplyWindowInsetsListener((view,insets)->{
@@ -112,7 +117,8 @@ public class MainActivity extends Activity {
         LinearLayout quick=new LinearLayout(this);quick.setGravity(Gravity.CENTER);quick.setPadding(0,dp(6),0,dp(12));
         todayButton=new Button(this);todayButton.setText("Today");todayButton.setOnClickListener(v->{shown=LocalDate.now();render();});tomorrowButton=new Button(this);tomorrowButton.setText("Tomorrow");tomorrowButton.setOnClickListener(v->{shown=LocalDate.now().plusDays(1);render();});quick.addView(todayButton);quick.addView(tomorrowButton);root.addView(quick);
         ScrollView scroll=new ScrollView(this);list=new LinearLayout(this);list.setOrientation(LinearLayout.VERTICAL);scroll.addView(list);root.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
-        addButton=new Button(this);addButton.setText("＋  Add a task");addButton.setTextSize(17);addButton.setTextColor(Color.WHITE);addButton.setBackground(bg(BLUE,16));addButton.setOnClickListener(v->addDialog());root.addView(addButton,new LinearLayout.LayoutParams(-1,dp(58)));setContentView(root);
+        addButton=new Button(this);addButton.setText("＋  Add a task");addButton.setTextSize(17);addButton.setTextColor(Color.WHITE);addButton.setBackground(bg(BLUE,16));addButton.setOnClickListener(v->addDialog());root.addView(addButton,new LinearLayout.LayoutParams(-1,dp(58)));
+        TextView versionFooter=text(versionLabel(),11,MUTED);versionFooter.setGravity(Gravity.CENTER);versionFooter.setContentDescription(versionFooter.getText().toString().replace(" · build ",", Android version code "));root.addView(versionFooter,new LinearLayout.LayoutParams(-1,dp(26)));setContentView(root);
     }
     void render(){
         LocalDate now=LocalDate.now();title.setText(shown.equals(now)?"Today":shown.equals(now.plusDays(1))?"Tomorrow":shown.format(DateTimeFormatter.ofPattern("EEEE")));
