@@ -3,6 +3,7 @@
 A small, private, offline Android day planner. It uses only Android platform APIs and stores its data in the app's private on-device preferences.
 
 - Check off tasks for any day.
+- Long task text wraps onto additional lines while its checkbox stays centred.
 - Tap a task's text to edit it directly in the list.
 - Hold a task and drag vertically to reorder it; nearby tasks animate aside to
   show exactly where it will be placed.
