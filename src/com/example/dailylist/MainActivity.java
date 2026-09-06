@@ -46,7 +46,7 @@ public class MainActivity extends Activity {
         final Task task; final int touchSlop; float downX, downY; boolean swiping, dragging; Runnable beginDrag;
         SwipeTaskRow(Task t){
             super(MainActivity.this);task=t;touchSlop=ViewConfiguration.get(MainActivity.this).getScaledTouchSlop();
-            setOrientation(LinearLayout.HORIZONTAL);setGravity(Gravity.CENTER_VERTICAL);setPadding(dp(isSubtask(t)?34:6),dp(5),0,dp(5));setBackgroundColor(BACKGROUND);setClickable(true);
+            setOrientation(LinearLayout.HORIZONTAL);setGravity(Gravity.CENTER_VERTICAL);setMinimumHeight(dp(62));setPadding(dp(isSubtask(t)?34:6),dp(5),0,dp(5));setBackgroundColor(BACKGROUND);setClickable(true);
         }
         void startTracking(MotionEvent event){
             cancelDragHold();downX=event.getRawX();downY=event.getRawY();swiping=false;dragging=false;animate().cancel();
@@ -143,13 +143,13 @@ public class MainActivity extends Activity {
         FrameLayout.LayoutParams deleteParams=new FrameLayout.LayoutParams(dp(92),-1,Gravity.END);swipeLayer.addView(deleteHint,deleteParams);
         SwipeTaskRow row=new SwipeTaskRow(t);
         CheckBox cb=new CheckBox(this);cb.setChecked(t.done);cb.setLongClickable(false);cb.setButtonTintList(new android.content.res.ColorStateList(new int[][]{new int[]{android.R.attr.state_checked},new int[]{}},new int[]{BLUE,MUTED}));
-        EditText label=new EditText(this);label.setText(t.text);label.setTextSize(isSubtask(t)?16:17);label.setTextColor(t.done?MUTED:INK);label.setGravity(Gravity.CENTER_VERTICAL);label.setSingleLine(true);label.setImeOptions(EditorInfo.IME_ACTION_DONE);label.setPadding(dp(6),0,dp(4),0);label.setBackgroundColor(Color.TRANSPARENT);label.setFocusable(false);label.setCursorVisible(false);label.setLongClickable(false);if(t.done)label.setPaintFlags(label.getPaintFlags()|android.graphics.Paint.STRIKE_THRU_TEXT_FLAG);
-        cb.setOnCheckedChangeListener((b,x)->{t.done=x;save();render();});label.setOnClickListener(v->beginInlineEdit(label,t));label.setOnEditorActionListener((v,action,event)->{if(action==EditorInfo.IME_ACTION_DONE){finishInlineEdit();return true;}return false;});label.setOnFocusChangeListener((v,focused)->{if(!focused&&activeEditor==label)finishInlineEdit();});row.addView(cb,new LinearLayout.LayoutParams(dp(48),dp(52)));row.addView(label,new LinearLayout.LayoutParams(0,dp(52),1));swipeLayer.addView(row,new FrameLayout.LayoutParams(-1,-1));list.addView(swipeLayer,new LinearLayout.LayoutParams(-1,dp(62)));
+        EditText label=new EditText(this);label.setText(t.text);label.setTextSize(isSubtask(t)?16:17);label.setTextColor(t.done?MUTED:INK);label.setGravity(Gravity.CENTER_VERTICAL);label.setSingleLine(false);label.setHorizontallyScrolling(false);label.setMinHeight(dp(52));label.setImeOptions(EditorInfo.IME_ACTION_DONE);label.setPadding(dp(6),0,dp(4),0);label.setBackgroundColor(Color.TRANSPARENT);label.setFocusable(false);label.setCursorVisible(false);label.setLongClickable(false);if(t.done)label.setPaintFlags(label.getPaintFlags()|android.graphics.Paint.STRIKE_THRU_TEXT_FLAG);
+        cb.setOnCheckedChangeListener((b,x)->{t.done=x;save();render();});label.setOnClickListener(v->beginInlineEdit(label,t));label.setOnEditorActionListener((v,action,event)->{if(action==EditorInfo.IME_ACTION_DONE){finishInlineEdit();return true;}return false;});label.setOnFocusChangeListener((v,focused)->{if(!focused&&activeEditor==label)finishInlineEdit();});row.addView(cb,new LinearLayout.LayoutParams(dp(48),dp(52)));row.addView(label,new LinearLayout.LayoutParams(0,-2,1));swipeLayer.addView(row,new FrameLayout.LayoutParams(-1,-2));list.addView(swipeLayer,new LinearLayout.LayoutParams(-1,-2));
         View line=new View(this);line.setTag(t);line.setBackgroundColor(DIVIDER);list.addView(line,new LinearLayout.LayoutParams(-1,dp(1)));
     }
     void addCarryGroup(Task old){
-        LinearLayout group=new LinearLayout(this);group.setOrientation(LinearLayout.VERTICAL);group.setClickable(true);LinearLayout row=new LinearLayout(this);row.setGravity(Gravity.CENTER_VERTICAL);row.setPadding(dp(8),0,0,0);TextView plus=text("＋",23,BLUE);TextView label=text(old.text,16,Color.rgb(137,153,168));label.setPadding(dp(8),0,0,0);row.addView(plus,new LinearLayout.LayoutParams(dp(42),dp(52)));row.addView(label,new LinearLayout.LayoutParams(0,dp(52),1));group.addView(row);
-        for(Task child:subtasks(old,true)){LinearLayout childRow=new LinearLayout(this);childRow.setGravity(Gravity.CENTER_VERTICAL);childRow.setPadding(dp(50),0,0,0);TextView branch=text("↳",17,MUTED);TextView childLabel=text(child.text,15,Color.rgb(137,153,168));childLabel.setPadding(dp(5),0,0,0);childRow.addView(branch,new LinearLayout.LayoutParams(dp(28),dp(42)));childRow.addView(childLabel,new LinearLayout.LayoutParams(0,dp(42),1));group.addView(childRow);}
+        LinearLayout group=new LinearLayout(this);group.setOrientation(LinearLayout.VERTICAL);group.setClickable(true);LinearLayout row=new LinearLayout(this);row.setGravity(Gravity.CENTER_VERTICAL);row.setMinimumHeight(dp(52));row.setPadding(dp(8),0,0,0);TextView plus=text("＋",23,BLUE);TextView label=text(old.text,16,Color.rgb(137,153,168));label.setMinHeight(dp(52));label.setPadding(dp(8),0,0,0);row.addView(plus,new LinearLayout.LayoutParams(dp(42),dp(52)));row.addView(label,new LinearLayout.LayoutParams(0,-2,1));group.addView(row);
+        for(Task child:subtasks(old,true)){LinearLayout childRow=new LinearLayout(this);childRow.setGravity(Gravity.CENTER_VERTICAL);childRow.setMinimumHeight(dp(42));childRow.setPadding(dp(50),0,0,0);TextView branch=text("↳",17,MUTED);TextView childLabel=text(child.text,15,Color.rgb(137,153,168));childLabel.setMinHeight(dp(42));childLabel.setPadding(dp(5),0,0,0);childRow.addView(branch,new LinearLayout.LayoutParams(dp(28),dp(42)));childRow.addView(childLabel,new LinearLayout.LayoutParams(0,-2,1));group.addView(childRow);}
         group.setOnClickListener(v->carryForward(old));list.addView(group);
     }
     void carryForward(Task old){
@@ -158,6 +158,7 @@ public class MainActivity extends Activity {
     ArrayList<Task> tasksForDate(String date){ArrayList<Task> result=new ArrayList<>();for(Task t:tasks)if(t.date.equals(date))result.add(t);return result;}
     ArrayList<Task> dragBlock(Task task){ArrayList<Task> block=new ArrayList<>();block.add(task);if(!isSubtask(task))block.addAll(subtasks(task,false));return block;}
     View taskContainer(Task task){for(int i=0;i<list.getChildCount();i++){View child=list.getChildAt(i);if(child instanceof FrameLayout&&child.getTag()==task)return child;}return null;}
+    int taskVisualHeight(Task task){int height=0;for(int i=0;i<list.getChildCount();i++){View child=list.getChildAt(i);if(child.getTag()==task)height+=child.getHeight();}return height>0?height:dp(63);}
     void setTaskPreviewY(Task task,float y,boolean animate){
         for(int i=0;i<list.getChildCount();i++){View view=list.getChildAt(i);if(view.getTag()!=task)continue;if(!animate){view.animate().cancel();view.setTranslationY(y);continue;}Float target=dragPreviewTargets.get(view);if(target!=null&&Math.abs(target-y)<.5f)continue;dragPreviewTargets.put(view,y);view.animate().cancel();view.animate().translationY(y).setDuration(105).start();}
     }
@@ -171,7 +172,8 @@ public class MainActivity extends Activity {
     }
     DragPlacement previewTaskDrag(Task task,float dragX,float dragY){
         ArrayList<Task> order=tasksForDate(task.date);int from=order.indexOf(task);ArrayList<Task> block=dragBlock(task);if(from<0)return new DragPlacement(0,task.parent);ArrayList<Task> remaining=new ArrayList<>(order);remaining.removeAll(block);
-        int rawInsert=from+Math.round(dragY/(float)dp(63));DragPlacement placement=calculatePlacement(task,remaining,rawInsert,dragX,dragY<0,block.size());int shift=block.size()*dp(63);
+        int blockHeight=0;for(Task moved:block)blockHeight+=taskVisualHeight(moved);View dragged=taskContainer(task);int rawInsert=from;if(dragged!=null){float draggedCenter=dragged.getTop()+dragY+blockHeight/2f;rawInsert=0;for(Task candidate:remaining){View view=taskContainer(candidate);if(view!=null&&draggedCenter>view.getTop()+taskVisualHeight(candidate)/2f)rawInsert++;}}
+        DragPlacement placement=calculatePlacement(task,remaining,rawInsert,dragX,dragY<0,block.size());int shift=blockHeight;
         for(Task moved:block){setTaskPreviewY(moved,dragY,false);View container=taskContainer(moved);if(container!=null){container.setAlpha(.92f);container.setElevation(dp(8));container.setTranslationX(moved==task?Math.max(-dp(52),Math.min(dp(52),dragX)):0);}}
         for(int i=0;i<remaining.size();i++){float target=0;if(placement.insert>from&&i>=from&&i<placement.insert)target=-shift;else if(placement.insert<from&&i>=placement.insert&&i<from)target=shift;setTaskPreviewY(remaining.get(i),target,true);}
         return placement;
