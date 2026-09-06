@@ -9,6 +9,18 @@ and the version numbers match the Android app's `versionName`.
 
 ## [Unreleased]
 
+## [1.7] - 2026-09-06
+
+### Added
+
+- Wrapped long task and carry-over text onto additional lines while keeping
+  each checkbox vertically centred beside its task.
+
+### Changed
+
+- Updated drag-and-drop positioning to account for task rows of different
+  heights.
+
 ## [1.6.1] - 2026-09-04
 
 ### Fixed
