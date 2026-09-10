@@ -9,7 +9,10 @@ A small, private, offline Android day planner. It uses only Android platform API
   show exactly where it will be placed.
 - Hold and drag a task right to make it a subtask; drag a subtask left to
   promote it back to a normal task.
-- Quickly swipe a task left to delete it; use the temporary bottom bar to undo.
+- Swipe a task left to reveal Delete, then tap the button to confirm; use the
+  temporary bottom bar to undo.
+- Swipe a task right to reveal Tomorrow, then tap the button to move it to the
+  following day. Parent tasks bring their subtasks with them.
 - Add a task to the displayed day or its following day.
 - Unfinished tasks from earlier days appear greyed out on Today. Carrying a
   parent forward also carries only its unfinished subtasks.
