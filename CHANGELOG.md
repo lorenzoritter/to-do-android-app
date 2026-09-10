@@ -9,6 +9,27 @@ and the version numbers match the Android app's `versionName`.
 
 ## [Unreleased]
 
+## [1.8.1] - 2026-09-10
+
+### Added
+
+- Added a temporary Undo action after moving a task to tomorrow. Undo restores
+  the task, its original parent relationship, and any subtasks moved with it.
+
+## [1.8] - 2026-09-10
+
+### Added
+
+- Added a right-swipe action that reveals a Tomorrow button. Pressing it moves
+  the task to the following day; parent tasks bring their subtasks with them.
+
+### Changed
+
+- Changed left-swipe deletion to reveal a Delete button. A task is removed only
+  after the button is pressed, and the existing Undo action remains available.
+- Moving a subtask to the following day promotes it to a normal task because
+  its parent remains on the original day.
+
 ## [1.7] - 2026-09-06
 
 ### Added
