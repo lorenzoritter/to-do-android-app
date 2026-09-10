@@ -25,9 +25,8 @@ public class MainActivity extends Activity {
     static final int DELETE = Color.rgb(183,55,55);
     final ArrayList<Task> tasks = new ArrayList<>();
     final Handler handler = new Handler(Looper.getMainLooper());
-    LinearLayout root, list, undoBar; TextView title, subtitle; Button todayButton, tomorrowButton, addButton; LocalDate shown;
-    Task pendingDeletedTask; int pendingDeletedIndex = -1; Runnable dismissUndo;
-    final ArrayList<Task> pendingPromotedChildren = new ArrayList<>();
+    LinearLayout root, list, undoBar; TextView title, subtitle, undoMessage; Button todayButton, tomorrowButton, addButton; LocalDate shown;
+    Runnable dismissUndo, pendingUndoAction;
     final IdentityHashMap<View,Float> dragPreviewTargets = new IdentityHashMap<>();
     EditText activeEditor; Task activeEditTask;
     android.content.SharedPreferences prefs;
@@ -201,22 +200,21 @@ public class MainActivity extends Activity {
         if(activeEditor==null)return;EditText editor=activeEditor;Task task=activeEditTask;String updated=editor.getText().toString().trim();activeEditor=null;activeEditTask=null;if(updated.isEmpty())editor.setText(task.text);else if(!updated.equals(task.text)){task.text=updated;save();}editor.setCursorVisible(false);editor.setBackgroundColor(Color.TRANSPARENT);editor.setFocusable(false);editor.clearFocus();((InputMethodManager)getSystemService(INPUT_METHOD_SERVICE)).hideSoftInputFromWindow(editor.getWindowToken(),0);
     }
     void moveTaskToNextDay(Task t){
-        if(activeEditTask==t)finishInlineEdit();if(!tasks.contains(t))return;String next=LocalDate.parse(t.date).plusDays(1).toString();
-        if(isSubtask(t)){t.parent=0;t.date=next;}else{ArrayList<Task> children=subtasks(t,false);t.date=next;for(Task child:children)child.date=next;}
-        save();render();
+        if(activeEditTask==t)finishInlineEdit();if(!tasks.contains(t))return;discardPendingUndo();boolean wasSubtask=isSubtask(t);ArrayList<Task> moved=new ArrayList<>();moved.add(t);if(!wasSubtask)moved.addAll(subtasks(t,false));ArrayList<String> previousDates=new ArrayList<>();ArrayList<Long> previousParents=new ArrayList<>();for(Task task:moved){previousDates.add(task.date);previousParents.add(task.parent);}String next=LocalDate.parse(t.date).plusDays(1).toString();
+        if(wasSubtask)t.parent=0;for(Task task:moved)task.date=next;save();render();showUndo("Moved to tomorrow",()->{for(int i=0;i<moved.size();i++){Task task=moved.get(i);if(tasks.contains(task)){task.date=previousDates.get(i);task.parent=previousParents.get(i);}}});
     }
-    void deleteTaskWithUndo(Task t){if(activeEditTask==t)finishInlineEdit();int index=tasks.indexOf(t);if(index<0)return;pendingPromotedChildren.clear();if(!isSubtask(t))for(Task child:subtasks(t,false)){child.parent=0;pendingPromotedChildren.add(child);}tasks.remove(index);save();render();showUndo(t,index);}
-    void showUndo(Task task,int index){
-        if(dismissUndo!=null)handler.removeCallbacks(dismissUndo);pendingDeletedTask=task;pendingDeletedIndex=index;
+    void deleteTaskWithUndo(Task t){if(activeEditTask==t)finishInlineEdit();int index=tasks.indexOf(t);if(index<0)return;discardPendingUndo();ArrayList<Task> promotedChildren=new ArrayList<>();if(!isSubtask(t))for(Task child:subtasks(t,false)){child.parent=0;promotedChildren.add(child);}tasks.remove(index);save();render();showUndo("Task deleted",()->{tasks.add(Math.max(0,Math.min(index,tasks.size())),t);for(Task child:promotedChildren)if(tasks.contains(child))child.parent=t.id;});}
+    void showUndo(String message,Runnable undoAction){
+        if(dismissUndo!=null)handler.removeCallbacks(dismissUndo);pendingUndoAction=undoAction;
         if(undoBar==null){
-            undoBar=new LinearLayout(this);undoBar.setGravity(Gravity.CENTER_VERTICAL);undoBar.setPadding(dp(18),0,dp(10),0);undoBar.setBackground(bg(INK,14));TextView message=text("Task deleted",15,Color.WHITE);TextView undo=text("UNDO",14,PALE_BLUE);undo.setTypeface(Typeface.DEFAULT,Typeface.BOLD);undo.setGravity(Gravity.CENTER);undo.setPadding(dp(18),0,dp(8),0);undo.setClickable(true);undo.setFocusable(true);undo.setOnClickListener(v->undoDelete());undoBar.addView(message,new LinearLayout.LayoutParams(0,-1,1));undoBar.addView(undo,new LinearLayout.LayoutParams(dp(84),-1));
+            undoBar=new LinearLayout(this);undoBar.setGravity(Gravity.CENTER_VERTICAL);undoBar.setPadding(dp(18),0,dp(10),0);undoBar.setBackground(bg(INK,14));undoMessage=text("",15,Color.WHITE);TextView undo=text("UNDO",14,PALE_BLUE);undo.setTypeface(Typeface.DEFAULT,Typeface.BOLD);undo.setGravity(Gravity.CENTER);undo.setPadding(dp(18),0,dp(8),0);undo.setClickable(true);undo.setFocusable(true);undo.setOnClickListener(v->undoLastAction());undoBar.addView(undoMessage,new LinearLayout.LayoutParams(0,-1,1));undoBar.addView(undo,new LinearLayout.LayoutParams(dp(84),-1));
         }
+        undoMessage.setText(message);
         if(undoBar.getParent()==null){LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(-1,dp(52));p.setMargins(0,dp(8),0,dp(8));root.addView(undoBar,root.indexOfChild(addButton),p);undoBar.setAlpha(0f);undoBar.setTranslationY(dp(10));undoBar.animate().alpha(1f).translationY(0).setDuration(140).start();}
-        dismissUndo=()->{pendingDeletedTask=null;pendingDeletedIndex=-1;pendingPromotedChildren.clear();hideUndo();};handler.postDelayed(dismissUndo,4500);
+        dismissUndo=()->{dismissUndo=null;pendingUndoAction=null;hideUndo();};handler.postDelayed(dismissUndo,4500);
     }
-    void undoDelete(){
-        if(pendingDeletedTask==null)return;if(dismissUndo!=null)handler.removeCallbacks(dismissUndo);int index=Math.max(0,Math.min(pendingDeletedIndex,tasks.size()));Task restored=pendingDeletedTask;tasks.add(index,restored);for(Task child:pendingPromotedChildren)if(tasks.contains(child))child.parent=restored.id;pendingPromotedChildren.clear();pendingDeletedTask=null;pendingDeletedIndex=-1;save();render();hideUndo();
-    }
+    void undoLastAction(){if(pendingUndoAction==null)return;if(dismissUndo!=null)handler.removeCallbacks(dismissUndo);Runnable action=pendingUndoAction;pendingUndoAction=null;dismissUndo=null;action.run();save();render();hideUndo();}
+    void discardPendingUndo(){if(dismissUndo!=null)handler.removeCallbacks(dismissUndo);dismissUndo=null;pendingUndoAction=null;hideUndo();}
     void hideUndo(){if(undoBar!=null&&undoBar.getParent()!=null){undoBar.animate().cancel();root.removeView(undoBar);}}
     @Override protected void onPause(){finishInlineEdit();super.onPause();}
     @Override protected void onDestroy(){if(dismissUndo!=null)handler.removeCallbacks(dismissUndo);super.onDestroy();}
