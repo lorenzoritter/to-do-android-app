@@ -9,6 +9,13 @@ and the version numbers match the Android app's `versionName`.
 
 ## [Unreleased]
 
+## [1.8.1] - 2026-09-10
+
+### Added
+
+- Added a temporary Undo action after moving a task to tomorrow. Undo restores
+  the task, its original parent relationship, and any subtasks moved with it.
+
 ## [1.8] - 2026-09-10
 
 ### Added
