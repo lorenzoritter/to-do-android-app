@@ -43,23 +43,24 @@ public class MainActivity extends Activity {
     }
 
     class SwipeTaskRow extends LinearLayout {
-        final Task task; final int touchSlop; float downX, downY; boolean swiping, dragging; Runnable beginDrag;
+        final Task task; final int touchSlop; float downX, downY, startTranslationX; boolean swiping, dragging; Runnable beginDrag;
         SwipeTaskRow(Task t){
             super(MainActivity.this);task=t;touchSlop=ViewConfiguration.get(MainActivity.this).getScaledTouchSlop();
             setOrientation(LinearLayout.HORIZONTAL);setGravity(Gravity.CENTER_VERTICAL);setMinimumHeight(dp(62));setPadding(dp(isSubtask(t)?34:6),dp(5),0,dp(5));setBackgroundColor(BACKGROUND);setClickable(true);
         }
         void startTracking(MotionEvent event){
-            cancelDragHold();downX=event.getRawX();downY=event.getRawY();swiping=false;dragging=false;animate().cancel();
+            cancelDragHold();animate().cancel();downX=event.getRawX();downY=event.getRawY();startTranslationX=getTranslationX();swiping=false;dragging=false;
+            if(Math.abs(startTranslationX)>1f)return;
             beginDrag=()->{if(!isAttachedToWindow())return;if(activeEditTask==task)finishInlineEdit();dragging=true;performHapticFeedback(HapticFeedbackConstants.LONG_PRESS);((View)getParent()).setElevation(dp(8));setBackground(bg(PALE_BLUE,12));getParent().requestDisallowInterceptTouchEvent(true);previewTaskDrag(task,0,0);};
             handler.postDelayed(beginDrag,ViewConfiguration.getLongPressTimeout());
         }
         void cancelDragHold(){if(beginDrag!=null){handler.removeCallbacks(beginDrag);beginDrag=null;}}
         @Override public boolean onInterceptTouchEvent(MotionEvent event){
-            if(event.getActionMasked()==MotionEvent.ACTION_DOWN){startTracking(event);return false;}
+            if(event.getActionMasked()==MotionEvent.ACTION_DOWN){startTracking(event);return Math.abs(startTranslationX)>1f;}
             if(event.getActionMasked()==MotionEvent.ACTION_MOVE){
                 float dx=event.getRawX()-downX,dy=event.getRawY()-downY;
                 if(dragging)return true;
-                if(Math.abs(dx)>touchSlop||Math.abs(dy)>touchSlop){cancelDragHold();if(dx < -touchSlop && Math.abs(dx) > Math.abs(dy)*1.2f){swiping=true;getParent().requestDisallowInterceptTouchEvent(true);return true;}}
+                if(Math.abs(dx)>touchSlop||Math.abs(dy)>touchSlop){cancelDragHold();if(Math.abs(dx)>touchSlop&&Math.abs(dx)>Math.abs(dy)*1.2f){swiping=true;closeOtherTaskActions(this);getParent().requestDisallowInterceptTouchEvent(true);return true;}}
             }
             if(event.getActionMasked()==MotionEvent.ACTION_UP){cancelDragHold();if(dragging)return true;}
             if(event.getActionMasked()==MotionEvent.ACTION_CANCEL)cancelDragHold();
@@ -72,21 +73,20 @@ public class MainActivity extends Activity {
                 case MotionEvent.ACTION_MOVE:
                     float dx=event.getRawX()-downX,dy=event.getRawY()-downY;
                     if(dragging){previewTaskDrag(task,dx,dy);return true;}
-                    if(!swiping && dx < -touchSlop && Math.abs(dx) > Math.abs(dy)*1.2f){swiping=true;getParent().requestDisallowInterceptTouchEvent(true);}
-                    if(swiping){float offset=Math.min(0,dx);setTranslationX(offset);setAlpha(Math.max(.55f,1f-Math.abs(offset)/Math.max(1f,getWidth()*1.5f)));}
+                    if(!swiping&&Math.abs(dx)>touchSlop&&Math.abs(dx)>Math.abs(dy)*1.2f){swiping=true;closeOtherTaskActions(this);getParent().requestDisallowInterceptTouchEvent(true);}
+                    if(swiping){float offset=startTranslationX+dx;setTranslationX(Math.max(-dp(92),Math.min(dp(112),offset)));setAlpha(1f);}
                     return true;
                 case MotionEvent.ACTION_UP:
                     cancelDragHold();getParent().requestDisallowInterceptTouchEvent(false);
                     if(dragging){float dragX=event.getRawX()-downX,dragY=event.getRawY()-downY;DragPlacement placement=previewTaskDrag(task,dragX,dragY);dragging=false;setBackgroundColor(BACKGROUND);clearDragPreview();finishTaskDrag(task,placement,dragX,dragY);return true;}
-                    if(swiping && -getTranslationX() >= Math.max(dp(72),getWidth()*.25f)){
-                        animate().translationX(-getWidth()).alpha(0f).setDuration(160).withEndAction(()->deleteTaskWithUndo(task)).start();
-                    }else resetPosition();
+                    if(swiping){float offset=getTranslationX();settlePosition(offset<=-dp(46)?-dp(92):offset>=dp(56)?dp(112):0);}else resetPosition();
                     swiping=false;return true;
                 case MotionEvent.ACTION_CANCEL:
                     cancelDragHold();getParent().requestDisallowInterceptTouchEvent(false);dragging=false;clearDragPreview();resetPosition();swiping=false;return true;
             }
             return super.onTouchEvent(event);
         }
+        void settlePosition(float x){animate().cancel();animate().translationX(x).alpha(1f).setDuration(160).start();}
         void resetPosition(){setBackgroundColor(BACKGROUND);animate().translationX(0).translationY(0).alpha(1f).setDuration(160).start();}
         @Override protected void onDetachedFromWindow(){cancelDragHold();super.onDetachedFromWindow();}
     }
@@ -138,8 +138,13 @@ public class MainActivity extends Activity {
     boolean needsCarry(Task parent){return !parent.done||!subtasks(parent,true).isEmpty();}
     boolean hasCarrySuccessor(Task task){for(Task t:tasks)if(t.source==task.id)return true;return false;}
     long newTaskId(){long id=System.currentTimeMillis();while(findTask(id)!=null)id++;return id;}
+    void closeOtherTaskActions(SwipeTaskRow except){
+        for(int i=0;i<list.getChildCount();i++){View child=list.getChildAt(i);if(!(child instanceof FrameLayout))continue;FrameLayout layer=(FrameLayout)child;for(int j=0;j<layer.getChildCount();j++){View candidate=layer.getChildAt(j);if(candidate instanceof SwipeTaskRow&&candidate!=except)((SwipeTaskRow)candidate).resetPosition();}}
+    }
     void addTaskRow(Task t){
-        FrameLayout swipeLayer=new FrameLayout(this);swipeLayer.setTag(t);TextView deleteHint=text("Delete",14,Color.WHITE);deleteHint.setGravity(Gravity.CENTER);deleteHint.setTypeface(Typeface.DEFAULT,Typeface.BOLD);deleteHint.setBackgroundColor(DELETE);
+        FrameLayout swipeLayer=new FrameLayout(this);swipeLayer.setTag(t);TextView tomorrowHint=text("Tomorrow",14,Color.WHITE);tomorrowHint.setGravity(Gravity.CENTER);tomorrowHint.setTypeface(Typeface.DEFAULT,Typeface.BOLD);tomorrowHint.setBackgroundColor(BLUE);tomorrowHint.setClickable(true);tomorrowHint.setFocusable(true);tomorrowHint.setContentDescription("Move task to tomorrow");tomorrowHint.setOnClickListener(v->moveTaskToNextDay(t));
+        FrameLayout.LayoutParams tomorrowParams=new FrameLayout.LayoutParams(dp(112),-1,Gravity.START);swipeLayer.addView(tomorrowHint,tomorrowParams);
+        TextView deleteHint=text("Delete",14,Color.WHITE);deleteHint.setGravity(Gravity.CENTER);deleteHint.setTypeface(Typeface.DEFAULT,Typeface.BOLD);deleteHint.setBackgroundColor(DELETE);deleteHint.setClickable(true);deleteHint.setFocusable(true);deleteHint.setContentDescription("Delete task");deleteHint.setOnClickListener(v->deleteTaskWithUndo(t));
         FrameLayout.LayoutParams deleteParams=new FrameLayout.LayoutParams(dp(92),-1,Gravity.END);swipeLayer.addView(deleteHint,deleteParams);
         SwipeTaskRow row=new SwipeTaskRow(t);
         CheckBox cb=new CheckBox(this);cb.setChecked(t.done);cb.setLongClickable(false);cb.setButtonTintList(new android.content.res.ColorStateList(new int[][]{new int[]{android.R.attr.state_checked},new int[]{}},new int[]{BLUE,MUTED}));
@@ -194,6 +199,11 @@ public class MainActivity extends Activity {
     }
     void finishInlineEdit(){
         if(activeEditor==null)return;EditText editor=activeEditor;Task task=activeEditTask;String updated=editor.getText().toString().trim();activeEditor=null;activeEditTask=null;if(updated.isEmpty())editor.setText(task.text);else if(!updated.equals(task.text)){task.text=updated;save();}editor.setCursorVisible(false);editor.setBackgroundColor(Color.TRANSPARENT);editor.setFocusable(false);editor.clearFocus();((InputMethodManager)getSystemService(INPUT_METHOD_SERVICE)).hideSoftInputFromWindow(editor.getWindowToken(),0);
+    }
+    void moveTaskToNextDay(Task t){
+        if(activeEditTask==t)finishInlineEdit();if(!tasks.contains(t))return;String next=LocalDate.parse(t.date).plusDays(1).toString();
+        if(isSubtask(t)){t.parent=0;t.date=next;}else{ArrayList<Task> children=subtasks(t,false);t.date=next;for(Task child:children)child.date=next;}
+        save();render();
     }
     void deleteTaskWithUndo(Task t){if(activeEditTask==t)finishInlineEdit();int index=tasks.indexOf(t);if(index<0)return;pendingPromotedChildren.clear();if(!isSubtask(t))for(Task child:subtasks(t,false)){child.parent=0;pendingPromotedChildren.add(child);}tasks.remove(index);save();render();showUndo(t,index);}
     void showUndo(Task task,int index){
